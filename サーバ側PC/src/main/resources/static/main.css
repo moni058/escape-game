@@ -1,0 +1,11 @@
+@charset "UTF-8";
+/* static/css/style.css */
+.fullscreen {
+  position: fixed;        /* 画面に固定 */
+  top: 0;
+  left: 0;
+  width: 100vw;           /* ビューポートの幅に合わせる */
+  height: 100vh;          /* ビューポートの高さに合わせる */
+  object-fit: cover;      /* はみ出さず、トリミングしつつ埋める */
+  z-index: 9999;          /* 必要に応じて他要素より前に出す */
+}

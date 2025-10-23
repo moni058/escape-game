@@ -1,0 +1,149 @@
+@charset "UTF-8";
+/* static/css/style.css */
+
+.fullscreen {
+  position: fixed;  
+  margin: 0;
+  padding: 0;      /* 画面に固定 */
+  top: 0;
+  left: 0;
+  width: 100%;           /* ビューポートの幅に合わせる */
+  height: 100%;          /* ビューポートの高さに合わせる */
+  object-fit: cover;      /* はみ出さず、トリミングしつつ埋める */
+  z-index: 9998;          /* 必要に応じて他要素より前に出す */
+  object-position: center;
+  display: none;
+}
+
+#ruleVideo {
+	display: none;
+}
+
+#transition {
+	display: none;
+	
+}
+body {
+	background-image: url("/second-background_fixed.png");
+}
+
+#timer {
+	position: absolute;
+	font-size: 70px;
+	color: white;
+	top: 850px;
+	left: 240px;
+	text-align: center;
+}
+
+#floor {
+	position: absolute;
+	font-size: 70px;
+	color: white;
+	top: 740px;
+	left: 310px;
+	text-align: center;
+	transform: translate(-50%, -50%); /* 要素中心を基準に移動 */
+}
+
+.fulldisp {
+	position: fixed;  
+	margin: 0;
+	padding: 0;      /* 画面に固定 */
+	top: 0;
+	left: 0;
+	width: 110%;           /* ビューポートの幅に合わせる */
+	height: 110%;          /* ビューポートの高さに合わせる */
+	object-fit: cover;      /* はみ出さず、トリミングしつつ埋める */
+	z-index: 9999;          /* 必要に応じて他要素より前に出す */
+	object-position: center;
+	display: none;
+}
+
+#message {
+	position: absolute;
+	color: white;
+	font-size: 60px;;
+	top : 60px;
+	left : 935px;
+	z-index: 1;
+	text-align: center;
+	transform: translate(-50%, -50%); /* 要素中心を基準に移動 */
+}
+
+.main {
+	position: absolute;
+	top: 55%;
+	left: 50%;
+	transform: translate(-50%,-50%); /* 基準となる場所を中心にずらす */
+	display: none;
+	z-index: 500;
+}
+#sub {
+	position: absolute;  /* 絶対位置指定 */
+	top: 80%;            /* 上から50% */
+	left: 50%;           /* 左から50% */
+	color: white;
+	transform: translate(-50%, -50%); /* 自分の幅・高さの半分だけ移動して真ん中に */
+	font-size: 100px;
+	transform: translate(-50%, -50%); /* 要素中心を基準に移動 */
+}
+
+#center {
+  position: absolute;  /* 絶対位置指定 */
+  top: 40%;            /* 上から50% */
+  left: 50%;           /* 左から50% */
+  color: white;
+  transform: translate(-50%, -50%); /* 自分の幅・高さの半分だけ移動して真ん中に */
+  font-size: 100px;
+  transform: translate(-50%, -50%); /* 要素中心を基準に移動 */
+}
+
+#resultFloor {
+	position: absolute;
+	font-size: 150px;
+	color: black;
+	top: 210px;
+	left: 1400px;
+	text-align: center;
+	transform: translate(-50%, -50%); /* 要素中心を基準に移動 */
+	display: none;
+	z-index: 10001;
+}
+
+
+#ranking {
+	position: absolute;
+	font-size: 150px;
+	color: black;
+	top: 440px;
+	left: 1400px;
+	text-align: center;
+	transform: translate(-50%, -50%); /* 要素中心を基準に移動 */
+	display: none;
+	z-index: 9999;
+}
+
+#total {
+	position: absolute;
+	font-size: 60px;
+	color: black;
+	top: 400px;
+	left: 1100px;
+	text-align: center;
+	transform: translate(-50%, -50%); /* 要素中心を基準に移動 */
+	display: none;
+	z-index: 9999;
+}
+
+#tryCount {
+	position: absolute;
+	font-size: 150px;
+	color: black;
+	top: 0px;
+	left: 860px;
+	text-align: center;
+	transform: translate(-50%, -50%); /* 要素中心を基準に移動 */
+	display: none;
+	z-index: 10000;
+}

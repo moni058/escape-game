@@ -1,0 +1,2160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>タイトル</title>
+  <link rel ="stylesheet" href ="/game.css">
+</head>
+<body>
+	<!-- ゲーム画面表示部分 -->
+	<p id = "floor">floor</p>
+	<p id = "timer"></p>
+	<p id = "message"></p>
+	<p id ="center"></p>
+	<p id ="sub"></p></p>
+	<!-- リザルト画面表示部分 -->
+	<p id = "ranking"></p>
+	<p id = "total"></p></p>
+	<p id = "resultFloor"></p></p>
+	<p id = "tryCount"></p></p>
+	<!-- 画像・動画要素-->
+	<video id="ruleVideo" class = "fullscreen" src="second_examination_first.mp4"></video>
+	<video id="trainCount" class = "main" src="電車カウント.mp4"></video>
+	<video id="daruma" class = "main" src="だるまさん.mp4"></video>
+	<video id="clear" class = fullscreen src="クリア動画.mp4"></video>
+	<img id = "startGamen" class = "fulldisp" src ="startGamen.png">
+	<img id = "playerRankC" class = "fullscreen" src ="playerRankC.jpg">
+	<img id = "playerRankB" class = "fullscreen" src ="playerRankB.jpg">
+	<img id = "playerRankA" class = "fullscreen" src ="playerRankA.jpg">
+	<img id = "playerRankA+" class = "fullscreen" src ="playerRankA+.jpg">
+	<img id = "playerRankS" class = "fullscreen" src ="playerRankS.jpg">
+	<img id ="transition" class ="fullscreen" src ="transition.png">
+	<img id ="exit" class ="fullscreen" src ="退出ブース1.png">
+	<canvas id="board"></canvas>
+	<img id ="main" class = "main">
+	<script>
+		/*
+		* html要素の取得
+		*/
+		const floor = document.getElementById('floor');
+		const message = document.getElementById("message");
+		const startGamen = document.getElementById("startGamen");
+		const ruleVideo = document.getElementById("ruleVideo");
+		const transition = document.getElementById("transition");
+		const main = document.getElementById("main");
+		const center = document.getElementById("center");
+		const trainCount = document.getElementById("trainCount");
+		const daruma = document.getElementById("daruma");
+		const sub = document.getElementById("sub");
+		const tryCount = document.getElementById("tryCount");
+		const ranking = document.getElementById("ranking");
+		const total = document.getElementById("total");
+		const resultFloor = document.getElementById("resultFloor");
+		const exit = document.getElementById("exit");
+		const clear = document.getElementById("clear");
+		
+		/*
+		* Audioオブジェクトの宣言
+		*/
+		const correctMusic = new Audio("正解7.mp3"); // 正解音
+		const moveMusic = new Audio("スピードアップ1.mp3"); // 移動音
+		const incorrectMusic = new Audio("エラー1.mp3"); // 不正解音
+		const chaka2 = new Audio("拳銃の弾切れ.mp3");
+		const chaka1 = new Audio("拳銃の弾切れ_1.mp3");
+		
+		/*
+		* 一筆書きのマップ宣言
+		*/
+		const level1Map = [
+		[1,1,1,1,1,1,1,1,1,1],
+		[1,0,0,1,0,1,0,0,1,1],
+		[1,0,0,0,0,1,0,0,1,1],
+		[1,0,0,0,0,0,0,0,1,1],
+		[1,0,0,0,0,0,0,0,1,1],
+		[1,0,0,0,0,0,0,0,1,1],
+		[1,0,0,0,0,0,0,0,1,1],
+		[1,1,1,1,1,1,1,1,1,1],
+		];
+		
+		const level2Map = [
+		[0,0,0,1,1,1,0,0,0,0],
+		[0,0,0,0,0,1,0,1,0,0],
+		[0,0,0,0,1,1,0,0,0,0],
+		[0,0,0,0,0,0,0,0,0,0],
+		[0,0,0,1,0,0,0,1,0,0],
+		[0,0,0,1,0,0,0,1,0,0],
+		[0,0,0,0,1,0,0,1,0,0],
+		[0,0,1,0,0,0,0,0,0,0],
+		];
+		
+		const specMap = [
+		[0,0,0,1,0,0,0,0,0,1],
+		[0,0,0,1,0,0,0,1,0,1],
+		[0,0,1,1,0,0,0,1,0,1],
+		[0,0,0,0,0,1,0,0,0,1],
+		[0,0,0,1,1,0,0,0,0,1],
+		[0,0,0,1,1,0,0,0,0,1],
+		[0,0,0,0,0,0,0,0,0,1],
+		[0,0,0,0,0,0,0,0,0,1],
+		[0,0,0,0,0,0,0,0,0,1]
+		];
+		
+		/*
+		* 汎用変数の宣言
+		*/
+		let blinkInterval;
+		let pollingInterval = null; //ポーリング用の変数
+		let player; //プレイヤー変数
+		const pcNum = 1;
+		let canOperate = true;; // 操作可能かどうかのフラグ
+		let startFlg = false; // 最初のボタン押下でゲームをスタートするためのフラグ
+		const answerListAll = [0,0,0,0,0,0,0,0,0]; // 「all」の解答で使う
+		const answerListSequence = []; // 「sequence」の解答で使う
+		let answerSet = new Set(); // 「sequence」で重複を確認する際に使う
+		let oneStrokeMap = Array.from({ length: 8 }, () => Array(10).fill(0)); // 一筆書きの状況を保存するマップ
+		let oneX = 0; // 一筆書きのx座標
+		let oneY = 0; // 一筆書きのy座標
+		let boardFlg = false; // 解答ボタンに文字を置くかどうか
+		let flash1Flg = false; // 点滅問題1の専用フラグ
+		let flash2Flg = false; // 点滅問題1の専用フラグ
+		let simulSequenceFlg = false // 点滅暗記レベル2のフラグ(連続同時押しフラグ)
+		let fruitFlg = false // フルーツ問題のフラグ
+		let simulSequenceCount = 0; // 連続同時押し問題の正解数のカウント
+		let userSet = new Set(); // 異変探しの解答リスト
+		let chakaFlg = false;
+		let chakaFlg2 = false;
+		const circlePositions = []; // ライト問題の4つの円の座標
+		const positions = [];
+		let circleStates = [0, 0, 0, 0]; // 0～3の円の塗りつぶし状態を管理
+		let sumCount = 1; // 数字を合計していく問題
+		let totalSeconds;
+		let doubleFlg = false; // 連続押し問題の2回押し問題
+		let pianoFlg = false; // 音階問題のフラグ
+		let flashIndex = 0; // フラッシュ暗算で難易度が変わるたびに答えとかを変えるためのやつ
+		let flashMemoFlg = false; // フラッシュ暗記問題のフラグ
+		const cross = ["x","15","鬼","x","4","x","o","x","y","x","夜","x","19","朝","x","♦︎4","x","o","x","y","x",""]; // 10個
+		const prime = ["5","15","8","57","29","103","23","51","49","10","91","63","19","7","2","♣︎6","1","68","0","99","75","21",""]; // 7個
+		let flashCulcFlg = false; // フラッシュ暗算問題のフラグ
+		let crossFlg = false; // xを数える問題のフラグ
+		let tempIndex = 0; // perfect問題で正解数を管理するフラグ
+		const rainbowImageList = ["","tower_6th_rainbow/6color.png","tower_6th_rainbow/4color.png","tower_6th_rainbow/fullcolor.png","tower_6th_rainbow/2color.png","tower_6th_rainbow/5color.png","tower_6th_rainbow/3color.png"] // 2時画像のリスト
+		let specStrokeFlg = false; // 一筆書き問題の特殊フラグ
+		let trainFlg = false; // 乗客カウント問題のフラグ
+		let primeFlg = false; // 素数問題のフラグ
+		let spotDiffFlg = false; // 間違い探し問題のフラグ
+		let lastFlg = false; // 最終問題のフラグ
+		let lastIndex = 0; // 最終問題の解答ボタン候補の♻︎ボタンによって変化するインデックス
+		let flashTimerId; // フラッシュ問題のタイマー
+		let darumaCount = 0; // だるま問題のカウント
+		let darumaFlg = false; // だるま問題のフラグ
+		let playerId = []; // プレイヤーIDを配列にしたやつ 
+		let problems; // 問題配列を定義だけ先にする
+		
+		// 経過時間（秒）
+		let time = 0;
+		
+		const lastList = [
+		  ["1F", "2F", "3F", "4F", "5F", "6F", "7F", "8F", "♻"],
+		  ["9F", "10F", "11F", "12F", "13F", "14F", "15F", "16F", "♻",],
+		  ["17F", "18F", "19F", "20F","21F", "22F", "23F", "24F", "♻",],
+		  ["25F", "26F", "27F", "28F","29F", "30F", "31F", "32F", "♻",],
+		  ["33F","34F","35F","","","","","", "♻"],
+		  ["1","2","3","4","6","7","8","9", "♻"]  
+		];
+
+		// 鬼が見る瞬間（止まれ！）
+		const upperTimes = [3, 7, 10, 13, 19, 24, 29, 33, 36, 39, 45, 50, 55, 58, 61, 67, 72, 77, 80, 83, 89, 94, 99, 102, 105, 111, 116, 121, 124, 127, 133, 138, 143, 146, 149, 155, 160, 165, 168, 171, 177, 182, 187, 190, 193, 199, 204, 209, 212, 215, 221, 226, 231, 234, 237, 243, 248, 253, 256, 259, 265, 270, 275, 278, 281, 287, 292, 297, 300, 303, 309, 314, 319, 322, 325, 331, 336, 341, 344, 347, 353, 358, 363, 366, 369, 375, 380, 385, 388, 391, 397, 402, 407, 410, 413, 419, 424, 429, 432, 435, 441, 446, 451, 454, 457, 461, 466, 471, 475, 478];
+
+		// 鬼が見なくなる瞬間（動け！）
+		const lowerTimes = [0,5, 8, 11, 15, 22, 26, 31, 34, 37, 41, 48, 51, 54, 58, 65, 68, 71, 75, 82, 85, 88, 92, 99, 102, 105, 111, 114, 117, 121, 128, 131, 134, 138, 145, 148, 151, 155, 162, 165, 168, 172, 179, 182, 185, 189, 196, 199, 202, 206, 213, 216, 219, 223, 230, 233, 236, 240, 247, 250, 253, 257, 264, 267, 270, 274, 281, 284, 287, 291, 298, 301, 304, 308, 315, 318, 321, 325, 332, 335, 338, 342, 349, 352, 355, 359, 366, 369, 372, 376, 383, 386, 389, 393, 400, 403, 406, 410, 417, 420, 423, 427, 434, 437, 440, 444, 451, 454, 457, 461, 468, 471, 474, 478, 479];
+
+		// フラグの初期状態（動けない）
+		let canPush = false;
+
+
+		// 毎フレーム更新関数
+		function update() {
+			
+
+			// タイマー間隔（秒）
+			const interval = 0.1;
+		    // 秒単位でタイミング判定
+		    const currentSec = Math.floor(time);
+
+		    if (upperTimes.includes(currentSec)) {
+		        canPush = false;
+		    } else if (lowerTimes.includes(currentSec)) {
+		        canPush = true;
+		    }
+
+
+		    // 経過時間を進める
+		    time += interval;
+
+		    // 例えば500秒まで更新
+		    if (time < 500) {
+		        setTimeout(update, interval * 1000);
+		    }
+		}
+
+		
+
+		/** ポーリングを行う関数
+		* @param {string} pcNum pcの識別番号(1~4)
+		**/
+		function startPolling(pcNum){
+			console.log("ポーリング");
+			if (pollingInterval !== null)return; //二重起動防止
+			
+			pollingInterval = setInterval(async() =>{
+				const response = await fetch(`http://10.26.84.5:9910/api/PC/${pcNum}`);
+				player = await response.json();
+				if (player.qrid){
+					startFlg = true
+					startGamen.style.display = "block";
+					clearInterval(pollingInterval);
+					
+					/* 解答ボタンの受付
+					*
+					* 操作を受け付けているかどうか
+					* 初回起動
+					*
+					*
+					*/
+					document.addEventListener("keydown",(event)=>{
+						if(!canOperate)return; //操作不可能だったらここでreturn
+						const problem = problems[player.floor];
+						
+						// 初回起動処理
+						if(startFlg){
+							startFlg = false;
+							startGamen.style.display = "none";
+							let wait = 46000;
+							if (player.tryCounts == 1){
+								ruleVideo.src = "ルール説明.mp4";
+								wait = 25000;
+							}else if (player.tryCounts == 2){
+								ruleVideo.src = "second_examination_third.mp4";
+								wait = 12000;
+							}else if (player.tryCounts >= 3){
+								ruleVideo.src = "second_examination_forthikou.mp4";
+								wait = 10000;
+							}
+							ruleVideo.load();
+							startGame(wait);
+							return;
+						}
+						// 最終問題フラグ
+						if (lastFlg){
+							if (event.key == "9"){
+								resetBoardLetters();
+								lastIndex++;
+								drawBoardLetters(lastList[lastIndex%6]);
+								return;
+							}
+							if (lastIndex%6 != 5){
+									
+								if (["1","2","3","4","5","6","7","8"].includes(event.key)){
+									if (lastIndex%6 == 4 && ["4","5","6","7","8"].includes(event.key)){
+										return;
+									}
+									lastMove(event.key);
+									if (player.floor == 32){
+										trainCount.style.display = "block";
+										trainCount.play();
+									}
+								}
+								return;
+							}else{
+								changeSquareColor(changeNum(event.key)[0], changeNum(event.key)[1], "white",false); // 押したボタンの色を変える
+
+								// 重複がない時だけ解答リストに追加
+								if(!answerSet.has(event.key)){
+									answerSet.add(event.key); 
+									answerListSequence.push(event.key);
+								}else{
+								}
+
+								// 順序押しの要素数が規定に達したら
+								if (answerListSequence.length == 4) {
+									
+									// 正誤判定
+									if (allCorrect(answerListSequence,["3","6","7","4"])) {
+										resetSequence(); //リセット
+										correctMusic.play(); // 正解音を再生する
+										ruleVideo.pause();
+										ruleVideo.style.display = "none";
+										clear.style.display = "block";
+										clear.play();
+										// 不正解処理
+									} else {
+										incorrect()
+;										resetSequence();
+									}
+								}
+								return;
+							}
+
+						}
+						switch(problem.mode){
+							case "single":{
+								// 音出す系の初回起動
+								if (player.floor === 16 && chakaFlg){
+									canOperate = false;
+									chakaFlg = false;
+									message.textContent = "空砲を数えろ";
+									chaka1.play();
+									setTimeout(() => {
+										canOperate = true;
+										message.textContent = "答えろ";
+									},7000 );
+									break;
+								}else if (player.floor === 17 && chakaFlg2){
+									canOperate = false;
+									chakaFlg2 = false;
+									message.textContent = "空砲を数えろ";
+									chaka2.play();
+									setTimeout(() => {
+										canOperate = true;
+										message.textContent = "答えろ";
+									},15000 );
+									break;
+								}else{
+								}
+								if (event.key === problem.answer) {
+									correct();
+								} else {
+									incorrect();
+									// 間違い探しの時に誤答で時間減少ペナルティ
+									if (spotDiffFlg){
+										if (totalSeconds >= 30){
+											ruleVideo.currentTime += 30;
+										}else{
+											ruleVideo.currentTime += totalSeconds;
+										}
+										totalSeconds -= 30;
+									}
+									// 失敗した時にもう一回再生するものがある時
+									if (player.floor == 16){
+										canOperate = false;
+										message.textContent = "空砲を数えろ";
+										setTimeout(() => {
+										  chaka1.play();
+										}, 1000); 
+										setTimeout(() => {
+											canOperate = true;
+											message.textContent = "答えろ";
+										},7000 );
+									}else if (player.floor == 17){
+										canOperate = false;
+										message.textContent = "空砲を数えろ"
+										setTimeout(() => {
+										  chaka2.play();
+										  setTimeout(() => {
+										  	canOperate = true;
+											message.textContent = "答えろ";
+										  },15000 );
+										}, 1000); 
+									}else if (crossFlg){
+										canOperate = false;
+										message.textContent = "xを数えろ";
+										setTimeout(() => {
+										  flashList(cross,300);
+										}, 500); 
+										setTimeout(() => {
+											canOperate = true;
+											message.textContent = "答えろ";
+										},7500); // ここはちゃんと確かめたから大丈夫
+									}else if (primeFlg){
+										canOperate = false;
+										message.textContent = "素数を数えろ";
+										setTimeout(() => {
+											flashList(prime,400);
+										},500)
+										setTimeout(() => {
+											canOperate = true;
+											message.textContent = "答えろ";
+										},9000);
+									}
+								}
+								break;
+							}
+							case "all": {
+								if (answerListAll[event.key - 1] === 0) {
+									answerListAll[event.key - 1] = 1;
+									fillSquareColor("red", event.key);
+								} 
+
+								if (allCorrect(problem.answer, answerListAll)) {
+									correct();
+								}
+								break;
+							}
+							case "sequence": {
+								
+								// 動画問題の初回起動
+								if (player.floor === 32 && trainFlg){
+									canOperate = false;
+									trainFlg = false;
+									message.textContent = "乗客を数えろ";
+									trainCount.play();
+									setTimeout(() => {
+										canOperate = true;
+										message.textContent = "答えろ";
+									},9000 );
+									break;
+								}
+													
+								changeSquareColor(changeNum(event.key)[0], changeNum(event.key)[1], "white"); // 押したボタンの色を変える
+								
+								// 重複がない時だけ解答リストに追加
+								if(!answerSet.has(event.key)){
+									// 音階問題で音を再生する
+									if (pianoFlg){
+										piano(event.key);
+									}
+									answerSet.add(event.key); 
+									answerListSequence.push(event.key);
+								}else{
+									// 白で塗る問題
+									if (doubleFlg){
+										canOperate = false;
+										setMainImage("ショートケーキ(白あり).png");
+										setTimeout(() => {
+											correct();
+											canOperate = true;
+										},500);
+									}
+								}
+								
+								// 順序押しの要素数が規定に達したら
+								if (answerListSequence.length === problem.yobi1) {
+									
+									// 正誤判定
+									if (allCorrect(answerListSequence,problem.answer)) {
+										resetSequence(); //リセット
+										correct();
+										// 不正解処理
+									} else {
+										resetSequence();
+										// 点滅問題レベル1
+										if (flash1Flg){
+											flash([2,7,6,9,1,3,8,5,4],5500);
+										}
+										incorrect();
+										// フラッシュ暗算
+										if (flashCulcFlg){
+											document.getElementById("message").textContent = "足せ";
+											canOperate = false;
+											setTimeout(()=>{
+												flashProb(problem);
+											},500);
+											setTimeout(()=>{
+												// fix 時間が怪しい
+												document.getElementById("message").textContent = "答えろ";
+												canOperate = true;
+											},5000);
+										}
+										if (flashMemoFlg){
+											message.textContent = "覚えろ";
+											canOperate = false;
+											setTimeout(()=>{
+												flashList(problem.flashList,500);
+											},500);
+											setTimeout(()=>{
+												// fix 時間が怪しい
+												message.textContent = "答えろ";
+												canOperate = true;
+											},5000);
+										}
+										if (player.floor == 32){
+											canOperate = false;
+											trainFlg = false;
+											message.textContent = "乗客を数えろ";
+											trainCount.play();
+											setTimeout(() => {
+												canOperate = true;
+												message.textContent = "答えろ";
+											},12000 );
+											break;
+										}
+										 if (player.floor == 30){
+											canOperate = false;
+											flashList(problem.yobi2,500);
+											setTimeout(() => {
+												canOperate = true;
+											},3000); // ここもちゃんと確かめた
+										 }
+									}
+								}
+								break;
+							}
+							case "simul": {
+								if (!answerSet.has(event.key)){
+									answerSet.add(event.key); // 同じキーは受け付けないようにする
+								}
+								if (fruitFlg){
+									// フルーツ問題の色変更処理
+									if (event.key === "1"){
+										center.textContent = "🍎";
+									}else if (event.key === "3"){
+										center.textContent = "🫐";
+									}else if (event.key === "7"){
+										center.textContent = "🥝";
+									}else if (event.key === "9"){
+										center.textContent = "🍌";
+									}
+									
+								}
+								if (answerSet.size == problem.answer[simulSequenceCount].size){ // セットの要素数が一致したら
+									if(isEqualSet(problem.answer[simulSequenceCount],answerSet)){ // 正誤判定
+										// 同時押し連続問題(点滅レベル2以降とか)
+										if (simulSequenceFlg){
+											simulSequenceCount++; // 正解数をプラス
+											if (problem.yobi1 === simulSequenceCount){
+												correct();
+											}else{
+												new Audio("決定音.mp3").play(); // ミニ正解音
+											}
+										}else if(fruitFlg) {
+											center.textContent = "🍇";
+											canOperate = false;
+											setTimeout(() => {
+												correct();
+												canOperate = true;
+											},500);
+										}else{
+											 //ただの同時押し問題の時の正解処理
+											correct();
+										}
+									}else{
+										if (flash2Flg){
+											document.getElementById("message").textContent = "覚えろ";
+											canOperate = false;
+											simulSequenceCount = 0;
+											setTimeout(()=>{
+												blinkSequence(["1","5","1","1"]);
+												blinkSequence(["2","6","4","2"]);
+												blinkSequence(["5","7","6","3"]);
+												blinkSequence(["9","8","9","5"]);
+											},1000);
+											setTimeout(()=>{
+												document.getElementById("message").textContent = "順に押せ";
+												canOperate = true;
+											},3300);
+										}
+									}
+									answerSet.clear(); // セットもリセット
+								}
+								break;
+								
+							}
+							case "allMap": {
+								let tempVal = moving(event.key);
+								if (specStrokeFlg){ 
+									while (tempVal){
+										tempVal = moving(event.key);
+									}
+								}
+								break;
+							}
+							case "set" : {
+								// 決定ボタン扱い
+								if (event.key === "5"){
+									if (isEqualSet(userSet,problem.answer)){
+										correct();
+									}else{
+										incorrect();
+										resetSqareColor(); // 正方形の色をリセット
+										// 解答ボタンに文字がある場合はそれを再描画
+										if (boardFlg){
+											drawBoardLetters(problems[player.floor].squareList);
+										}
+										userSet.clear();
+									}
+								}else{
+									changeSquareColor(changeNum(event.key)[0], changeNum(event.key)[1], "white");
+									if (event.key === "1"){
+										if (userSet.has("1")){
+											userSet.add("11");
+											changeSquareColor(changeNum(1)[0],changeNum(2)[1],"yellow");
+										}
+									}
+									userSet.add(event.key);
+								}
+								break;
+								
+							}
+							case "circle" : {
+								if (event.key === "4"){
+									if (player.floor == 19){
+										fillACircle();
+										circleStates[0] = 1;
+										if (circleStates.every(v => v === 1)) {
+										    correct();
+										}
+									}else if (player.floor == 25){
+										circleStates[0] = timeProb();
+										fillCircleByIndex(0,problem.colors[timeProb()]);
+										if (allCorrect(circleStates,problem.answer)){
+											correct();
+										}
+									}
+								}else if (event.key === "5"){
+									rotateCircle();
+									if (allCorrect(circleStates,problem.answer)){
+										correct();
+									}
+								}
+								break;
+							}
+							case "sum" : {
+								sumCount += (totalSeconds%60);
+								center.textContent = sumCount;
+								if (sumCount % 1000 == 0){
+									canOperate = false;
+									setTimeout(()=>{
+										correct();
+									},500);
+								}
+								break;
+							}
+							case "perfect" : {
+								if (problem.answer[tempIndex] === event.key){
+									// しょぼめな正解音
+									new Audio("決定音.mp3").play(); // ミニ正解音
+									useMainImageList(rainbowImageList,event.key);
+									
+									tempIndex++;
+									if (tempIndex === problem.yobi1){
+										correct();
+										tempIndex = 0; // リセット
+									}
+								}else{
+									incorrect();
+									tempIndex = 0; // リセット
+									setMainImage("tower_6th_rainbow/1color.png");
+								}
+								break;
+							}
+							case "daruma" : {
+								if (darumaFlg){
+									message.textContent = "100を目指せ";
+									darumaFlg = false;
+									daruma.style.display = "block";
+									update();
+									daruma.play();
+									sub.textContent = darumaCount;
+									break;
+								}
+								if (canPush){
+									darumaCount++;
+									sub.textContent = darumaCount;
+									if (darumaCount == 100){
+										correct();
+									}
+								}else{
+									incorrect();
+									darumaCount = 0;
+									sub.textContent = darumaCount;
+									time = 0;
+									daruma.currentTime = 0;
+									daruma.play();
+								}
+							}
+
+						}
+						
+					}); 
+
+
+					/* 解答ボタンを離した時の処理
+					*
+					*/
+					document.addEventListener("keyup",(event)=>{
+						switch (problems[player.floor].mode){
+							case "simul":{
+
+								answerSet.delete(event.key); // 該当キーを削除
+								
+							} 
+						}
+					});
+				
+
+					/*
+					* 問題管理オブジェクトのリスト
+					* n階のオブジェクトがインデックスnに格納されている
+					*/
+					problems = [
+					{},
+					{
+						number : 1,
+						mode : "single",
+						answer : "1",
+						message : "押せ"
+					},
+					{
+						number : 2,
+						mode : "all",
+						answer : [1,1,1,1,1,1,1,1,1],
+						message : "塗りつぶせ"
+					},
+					{
+						number : 3,
+						mode : "sequence",
+						answer : ["3","6","9","1","7","2","5","4","8"],
+						message : "順に押せ",
+						yobi1 : 9 // 連続押しの最大回数
+					},
+					{
+						number : 4,
+						mode : "sequence",
+						answer : ["2","7","6","9","1","3","8","5","4"],
+						message : "順に押せ",
+						yobi1 : 9
+					},
+					{
+						number : 5,
+						mode : "simul",
+						answer :[new Set(["4","5","6"])],
+						message : "押せ",
+					},
+					{
+						number : 6,
+						mode : "allMap",
+						answer : Array.from({ length: 8 }, () => Array(10).fill(1)),
+						message : "一筆で書け",
+						map : level1Map
+					},
+					{
+						number : 7,	
+						mode : "sequence",
+						answer : ["7","8","4","3","6"],
+						message : "順に押せ",
+						squareList : ["O", "J", "W", "T", "D", "F", "S", "M","P"],
+						yobi1 : 5
+					},
+					{
+						number : 8,
+						mode : "sequence",
+						answer : ["2","7","6","9","1","3","8","5","4"],
+						message : "順に押せ",
+						yobi1 : 9
+					},
+					{
+						number : 9,
+						mode : "single",
+						answer : "7",
+						message : "間違いを探せ(誤答は-30秒)",
+						squareList : ["1","2","3","4","5","6","7","8","9"]
+						
+					},
+					{
+						number : 10,
+						mode : "allMap",
+						answer : Array.from({ length: 8 }, () => Array(10).fill(1)),
+						message : "一筆で書け",
+						map : level2Map
+					},
+					{
+						number : 11,
+						mode : "simul",
+						answer : [new Set(["1","2","5","9"]),new Set(["5","6","7","8"]),new Set(["1","4","6","9"]),new Set(["1","2","3","5"])],
+						message : "覚えろ",
+						yobi1 : 4 // 何個連続で押させるか
+					},
+					{
+						number : 12,
+						mode : "sequence",
+						answer :  ["2","1","4","8","7","6","5","9","3"],
+						message : "順に押せ",
+						yobi1 : 9
+					},
+					{
+						number : 13,
+						mode : "sequence",
+						answer : ["2","6","8","1","7","9","3","5"],
+						message : "順に押せ",
+						yobi1 : 8,
+						squareList : ["A", "J", "N", "T", "D", "F", "S", "M", "O"]
+					},
+					{
+						number : 14,
+						mode : "sequence",
+						answer : ["8","3","2","1","9","7"],
+						message : "順に押せ",
+						yobi1 : 6
+					},
+					{
+						number : 15,
+						mode : "set",
+						answer : new Set(["1","2","4","6","7","8","11"]), // ガバだけど1は答えじゃないのに入っちゃうけどもう許容
+						message :"異変がある月を全て押せ",
+						squareList : ["1","2","3","4","決","6","7","8","9"]
+					},
+					{
+						number : 16,
+						mode : "single",
+						answer : "7",
+						message : "ボタンを押せ",
+						squareList : ["1","2","3","4","5","6","7","8","9"]
+					},
+					{
+						number : 17,
+						mode : "single",
+						answer : "4",
+						message : "ボタンを押せ",
+						squareList : ["1","2","3","4","5","6","7","8","9"]
+					},
+					{
+						number : 18,
+						mode : "sequence",
+						answer : ["5","9","7","6","4","3","8","1","2"],
+						message : "順に押せ",
+						yobi1 : 9
+					},
+					{
+						number : 19,
+						mode : "circle",
+						answer : "",
+						message : "全て灯せ",
+						colors : ["red"]
+					},
+					{
+						number : 20,
+						mode : "sum",
+						answer : "",
+						message : "1000の倍数にしろ"
+					},
+					{
+						number : 21,
+						mode : "sequence",
+						answer : "",
+						message : "塗れ",
+						yobi1 : 9
+					},
+					{
+						number :22,		
+						mode : "sequence",
+						message : "奏でろ",
+						answer : ["4","8","1","7","3","2","6","5"],
+						yobi1 : 8
+					},
+					{
+						number : 23,
+						mode : "sequence",
+						answer : [],
+						yobiAnswer : [ ["9","2","6","5","1"],["4","3","2","5"],["3","9","5"],["2","7"],["7"] ],
+						message : "足せ",
+						squareList : ["1","2","3","4","5","6","7","8","9"],
+						yobi1 : 0,
+						yobi2 : [ ["16123","14567","15200","16010","14890","15861",""],["619","893","532","781","777","723",""],["67","92","41","73","58","64",""],["3","7","6","2","4","5",""],["1","0","1","2","1","2",""] ]
+					},
+					{
+						number : 24,
+						mode : "simul",
+						answer : [new Set(["1","3"])],
+						message : "葡萄を描け"
+					},
+					{
+						number : 25,
+						mode : "circle",
+						answer : [2,3,1,4],
+						message : "揃えろ",
+						colors : ["","red","blue","green","yellow","white"]
+					},
+					{
+						number : 26,
+						mode : "sequence",
+						answer : ["5","8","3","2","9","4","1","6","7"],
+						message : "覚えろ",
+						flashList : ["5","8","3","2","9","4","1","6","7",""],
+						squareList : ["1","2","3","4","5","6","7","8","9"],
+						yobi1 : 9
+					},
+					{
+						number : 27,
+						mode : "perfect",
+						answer : ["4","6","2","5","1","3"],
+						message : "描け",
+						yobi1 : 6
+					},
+					{
+						number : 28,
+						mode : "single",
+						message : "xを数えろ",
+						answer : "1",
+						squareList : ["1","2","3","4","5","6","7","8","9"]
+					},
+					{
+						number : 29,
+						mode : "allMap",
+						answer : Array.from({ length: 8 }, () => Array(10).fill(1)),
+						message : "解け",
+						map : specMap
+					},
+					{
+						number :30,
+						mode : "sequence",
+						message : "続きを紡げ",
+						answer : playerId,
+						yobi1 : 4,
+						yobi2 : ["1423","5903","9209","5434","0390",""],
+						squareList : ["1","2","3","4","5","6","7","8","9"]
+						
+					},
+					{
+						number : 31,
+						mode : "sequence",
+						message : "孤立を探せ",
+						answer : ["4","9"],
+						yobi1 : 2,
+						squareList : ["1","2","3","4","5","6","7","8","9"]
+					},
+					{
+						number : 32,
+						mode : "sequence",
+						message : "押せ",
+						answer : ["2","5"],
+						yobi1 : 2,
+						squareList : ["1","2","3","4","5","6","7","8","9"]
+					},
+					{
+						number : 33,
+						mode : "daruma",
+						message : "押せ",
+					},
+					{
+						number : 34,
+						mode : "single",
+						message : "素数を数えろ",
+						answer : "7",
+						squareList : ["1","2","3","4","5","6","7","8","9"]
+					},
+					{
+						number : 35,
+						mode : "last",
+						message : "♠︎♣︎❤♦︎︎",
+						answer : ""
+					}
+					];
+				}else{
+				}
+				
+				
+			},3000) //3秒ごとに確認
+		}
+		
+		/**
+		 * 配列を右に回転させる
+		 * @param {number} times - 回転回数（省略で1回）
+		 * @returns {boolean[]} 回転後の配列
+		 */
+		function rotateArray(times = 1) {
+		    const len =circleStates.length;
+		    times = times % len; // 余分な回転は無視
+			circleStates = circleStates.slice(-times).concat(circleStates.slice(0, len - times));
+		}
+		
+		/** 円を赤く塗る
+		*
+		*/
+		function fillACircle(){
+			fillCircleByIndex(0,"red");
+		}
+		
+		/** ゲームを開始する関数
+		*
+		*/
+		function startGame(wait){
+			player.tryCounts++; // プレイヤーの挑戦回数を+1
+			canOperate = false;
+			ruleVideo.play();
+			ruleVideo.style.display = "block";
+			// 30問目のセットアップ
+			// 数字を文字列として扱う
+			const str = String(player.qrid);
+			// 1桁ずつの配列に変換（数値の配列にしたい場合は map(Number) を追加）
+			playerId = str.split("");
+			problems[30].answer = playerId;
+			setTimeout(() => {
+				canOperate = true;
+				ruleVideo.style.display = "none";
+				setTimer(); //タイマーを起動
+				drawGrid();
+				changeFloor(); // その階層の初期処理を行う
+				updateScreen();
+			},wait);
+
+		}
+		/** ゲームオーバー時の処理
+		*
+		*/
+		function endGame(){
+			canOperate = false;
+			
+			
+			fetch("http://10.26.84.5:9910/api/player",{
+				method:"POST",
+				headers:{"Content-Type":"application/json","Accept": "application/json",},
+				body: JSON.stringify(player)
+			});
+			fetch("http://10.26.84.5:9910/api/calcScore",{
+				method:"POST",
+				headers:{"Content-Type":"application/json","Accept": "application/json",},
+				body: JSON.stringify(player)
+			}).then(response => response.json())
+			.then(data => {
+				console.log("デバッグ");
+				
+				ruleVideo.style.display = "block";
+				setTimeout(() => {
+					ruleVideo.style.display = "none";
+					if (data.playerRank == "S"){
+						document.getElementById("playerRankS").style.display = "block";
+					}else if (data.playerRank == "A+"){
+						document.getElementById("playerRankA+").style.display = "block";
+					}else if (data.playerRank == "A"){
+						document.getElementById("playerRankA").style.display = "block";
+					}else if (data.playerRank == "B"){
+						document.getElementById("playerRankB").style.display = "block";
+					}else{
+						document.getElementById("playerRankC").style.display = "block";
+					}
+					resultFloor.textContent = data.floor;
+					resultFloor.style.display = "block";
+					
+					ranking.textContent = data.ranking;
+					ranking.style.display = "block";
+					
+					tryCount.textContent = player.tryCounts;
+					tryCount.style.display = "block";
+					
+					total.textContent = data.totalPlayer;
+					total.style.display = "none";
+				},7000);
+				setTimeout(() => {
+					exit.style.zIndex = 15000;
+					exit.style.display = "block";
+				},15000)
+				setTimeout(() => {
+				    fetch(`http://10.26.84.5:9910/api/reset/${pcNum}`, {
+				        method: "POST",
+				        headers: {
+				            "Content-Type": "application/json",
+				            "Accept": "application/json",
+				        },
+				    })
+				    .then(response => {
+				        if (!response.ok) throw new Error("Fetch failed");
+				    })
+				    .then(() => {
+				        // fetch成功時のみリロード
+				        location.reload();
+				    })
+				    .catch(err => {
+				        console.error("PCUsing POST failed:", err);
+				    });
+				}, 30000);
+
+			});
+			
+			
+		}
+		
+		/**
+		*
+		*/
+		function complete(){
+			ruleVideo.style.display = "none";
+		}
+		
+		/** タイマーを管理する関数
+		*
+		*/
+		function setTimer(){
+			let isValid = true;
+			totalSeconds = 480; // 制限時間を秒数で
+			const timerElem = document.getElementById('timer');
+
+			function formatTime(seconds) {
+			  const m = Math.floor(seconds / 60);
+			  const s = seconds % 60;
+			  return m + ':' + (s < 10 ? '0' + s : s);
+			}
+
+			timerElem.textContent = formatTime(totalSeconds);
+
+			const intervalId = setInterval(() => {
+			  totalSeconds--;
+			  timerElem.textContent = formatTime(totalSeconds);
+
+			},1000);
+			
+			const endGameIntervalId = setInterval(() => {
+				// タイムオーバーの時の処理
+				if (totalSeconds <= 0) {
+				clearInterval(intervalId);
+				clearInterval(endGameIntervalId);
+				endGame();
+				}
+			},50);
+		}
+		
+		/** 画面更新関数
+		* 階層と問題文の更新を行う
+		*/
+		function updateScreen(){
+			floor.textContent = player.floor;
+			message.textContent = problems[player.floor].message;
+		}
+		
+		
+		/** 正解時の進行関数
+		*
+		*/
+		function correct(){
+			canOperate = false;
+			player.floor += 1;
+			correctMusic.play(); // 正解音を再生する
+			updateScreen(); // 階層と問題文の更新
+			changeScreen(); // 画面遷移関数の呼び出し
+
+			
+		}
+		/** 不正解時の進行関数
+		*
+		*/
+		function incorrect(){
+			incorrectMusic.play(); // 不正解音鳴らす
+		}
+		
+		/** 画面遷移を呼び出す関数
+		*
+		*/
+		function changeScreen(){
+			transition.style.display = "block";
+			canOperate = false;
+			setTimeout(()=>{
+				moveMusic.play(); // 移動音
+			},500);
+			setTimeout(()=>{
+				transition.style.display = "none";
+				canOperate = true;
+				drawGrid();
+				changeFloor(); // 問題描画変更処理関数の呼び出し
+			},1000);
+		}
+			
+		
+		/** 解答ボタンの色ををリセットする処理
+		* @param {*} flg 
+		*/
+		function resetSqareColor(flg = true){
+			for (let i = 0; i < 3 ; i++){
+				for (let j = 0 ; j < 3 ;j++){
+					clearSquareColor(i,j,flg);
+				}
+				
+			}
+		}
+		
+		/** 階層移動時の共通処理
+		*
+		*/
+		function changeFloorUtil() {
+			simulSequenceCount = 0 ;
+			clearInterval(flashTimerId); // フラッシュ再生を止める
+			center.textContent = ""; // 表示を消す
+			sub.textContent = ""; // 下部の表示を消す
+			main.style.display = "none"; // 問題画像を非表示
+			resetSqareColor(); // 解答ボタンのの塗り潰しを削除
+			resetBoardLetters(); // 解答ボタンの文字を削除
+			clearInterval(blinkInterval); // 正方形の点滅を停止
+			ctx.clearRect(0, 0, canvas.width, canvas.height); // 画面全体を消去
+			drawGrid(); // 解答ボタンを再描画
+		}
+		
+		/** Canvasをリセットし解答ボタンを描画
+		* 
+		*/
+		function drawGrid() {
+		  ctx.beginPath();
+		  for (let i = 0; i <= n; i++) {
+		    // 縦線
+		    ctx.moveTo(offsetX + i * size, offsetY);
+		    ctx.lineTo(offsetX + i * size, offsetY + n * size);
+
+		    // 横線
+		    ctx.moveTo(offsetX, offsetY + i * size);
+		    ctx.lineTo(offsetX + n * size, offsetY + i * size);
+		  }
+		  ctx.strokeStyle = "black";
+		  ctx.stroke();
+		}
+		
+		/** 問題として表示する正方形を描画する
+		* 本来は変数にしたいけど一回保留で
+		*/
+		function makeSquare(){
+			ctx.moveTo(850,500);
+			ctx.lineTo(850,695);
+			ctx.lineTo(1045,695);
+			ctx.lineTo(1045,500);
+			ctx.lineTo(850,500);
+			ctx.strokeStyle = "white";
+			ctx.stroke();
+		}
+		
+		/** 問題として表示する正方形を塗る関数
+		*
+		*
+		*/
+		function fillSquareColor(color,num){
+			ctx.fillStyle = color;
+			let X = 850+65*changeNum(num)[0] ;
+			let Y = 500+65*changeNum(num)[1] ;
+			ctx.fillRect(X,Y,65,65);
+		}
+		
+		/**
+		 * 一筆書き問題に使用する正方形を描画する
+		 */
+		function makeSquaresGrid(rows){
+		    const size = 50; // 元の1辺を1.8倍
+		    const startX = 650;
+		    const startY = 300;
+		    const cols = 10;
+		    const gap = 5; // 隙間（必要に応じて調整）
+
+		    ctx.strokeStyle = "white";
+
+		    for(let row = 0; row < rows; row++){
+		        for(let col = 0; col < cols; col++){
+		            const x = startX + col * (size + gap);
+		            const y = startY + row * (size + gap);
+		            ctx.beginPath();
+		            ctx.rect(x, y, size, size);
+		            ctx.stroke();
+		        }
+		    }
+		}
+		
+		/** 一筆書きの正方形を塗りつぶす
+		*
+		*/
+		function fillSquare(x, y, color){
+		    const size = 50;
+		    const startX = 650;
+		    const startY = 300;
+		    const cols = 10;
+		    const rows = 8;
+		    const gap = 5;
+
+		    const drawX = startX + x * (size + gap);
+		    const drawY = startY + y * (size + gap);
+
+		    ctx.fillStyle = color;
+		    ctx.fillRect(drawX, drawY, size, size);
+		}
+		
+		/** 二つのセットの内容が等しいかを比較する
+		*
+		*/
+		function isEqualSet(setA, setB) {
+		    if (setA.size !== setB.size) return false; // 要素数が違う時点でNG
+		    for (let elem of setA) {
+		        if (!setB.has(elem)) return false; // 片方にしかない要素があればNG
+		    }
+		    return true; // 全部一致
+		}
+
+
+		
+		/** 解答ボタンの番号を(左から0,1,2 , 上から0,1,2)に変更する処理
+		* @param {num} 1~9の解答ボタン番号
+		*/
+		function changeNum(num){
+			let ret = [];
+			let x;
+			let y;
+			if (num == 1){
+			    x = 0; y = 0;
+			} else if (num == 2){
+			    x = 1; y = 0;
+			} else if (num == 3){
+			    x = 2; y = 0;
+			} else if (num == 4){
+			    x = 0; y = 1;
+			} else if (num == 5){
+			    x = 1; y = 1;
+			} else if (num == 6){
+			    x = 2; y = 1;
+			} else if (num == 7){
+			    x = 0; y = 2;
+			} else if (num == 8){
+			    x = 1; y = 2;
+			} else if (num == 9){
+			    x = 2; y = 2;
+			} else {
+			    throw new Error("numは1～9で指定してください");
+			}
+			ret.push(x);
+			ret.push(y);
+			return ret;
+			
+
+		}
+		
+		/** 最終問題で階層移動をする関数
+		*
+		*/
+		function lastMove(key){
+			if (lastIndex%6 == 5){
+				if (Number(key) > 2){
+					return;
+				}
+			}
+			if (lastIndex%6 < 5){
+				player.floor = 8*(lastIndex%6) + Number(key);
+				updateScreen(); // 階層と問題文の更新
+				changeScreen(); // 画面遷移関数の呼び出し
+				
+			}
+		}
+			
+		/** 背景画像をモニターサイズに調整する関数
+		* kioskモードにした時などに最大化する前の大きさに合わせられてしまうことに注意。画面を最大化した上でプログラミングを実行することが必要
+		* 
+		*/
+		function resizeBackground() {
+		    const html = document.documentElement;
+		    const body = document.body;
+
+		    // 実際のウィンドウサイズに合わせる
+		    const w = window.innerWidth;
+		    const h = window.innerHeight;
+
+		    html.style.width = w + "px";
+		    html.style.height = h + "px";
+
+		    body.style.width = w + "px";
+		    body.style.height = h + "px";
+
+		    // 背景設定
+		    body.style.backgroundRepeat = "no-repeat";
+		    body.style.backgroundSize = "100% 100%";  // 左上固定で画面いっぱい
+		    body.style.backgroundPosition = "left top";
+		}
+		resizeBackground();	
+		
+		/** 指定されたマスを指定された色で塗りつぶす関数
+		* 
+		* X,Y座標はtemp値
+		* @param {number} x - 左から0,1,2番目の正方形
+		* @param {number} y - 上から0,1,2番目の正方形 
+		*/
+		function changeSquareColor(x , y,color , flg = true){
+			if (flg){
+				if (lastFlg){
+					return;
+				}
+			}
+
+			ctx.fillStyle = color;
+			let X = offsetX+size*x +2; // offsetに正方形の分を足す
+			let Y = offsetY+size*y +2;
+			ctx.fillRect(X,Y,size-4,size-4);
+			
+		}
+		
+		/** 点滅させる関数
+		*
+		*/
+		function blink(x,y,color){
+			changeSquareColor(x,y,color);
+			setTimeout(()=>{
+				clearSquareColor(x,y);
+			},400)
+		}
+		
+		/**
+		 * 1～9のマスを順番に点滅させる関数
+		 * @param {number[]} sequence - 点滅させたいマス番号の配列 (例: [1,2,3,4,5,6,7,8,9])
+		 * @param {number} interval - 次のマスが点滅するまでの待機時間(ms)
+		 */
+		function blinkSequence(sequence, interval = 500) {
+		    sequence.forEach((num, index) => {
+		        // setTimeout で順番に処理
+		        setTimeout(() => {
+		            const [x, y] = changeNum(num); // マス番号 → x,y
+		            changeSquareColor(x, y, "white"); // 白で塗る
+		            setTimeout(() => {
+		                clearSquareColor(x, y); // 少し待って透明に戻す
+		            }, interval / 2); // 半分の時間で消える
+		        }, interval * index);
+		    });
+		}
+		
+		/** 解答ボタンの色を消す
+		* 正方形の色を消す
+		* 使い方はchangeSquareColorを参照
+		*/
+		function clearSquareColor(x,y,spec = true){
+			if (spec){
+				if (lastFlg){
+					return;
+				}
+			}
+			let X = offsetX+size*x +2;
+			let Y = offsetY+size*y +2;
+			ctx.clearRect(X,Y,size -4,size -4);
+		}
+		
+		/** modeがallの時に二つのリストを順序を守りながら比較する
+		*
+		*/
+		function allCorrect(answer , list){
+			let correctFlg = true;
+			for (let i = 0 ; i < answer.length ; i++){
+				if (answer[i] !== list[i]){
+					correctFlg = false;
+					return correctFlg;
+				}
+			}
+			return correctFlg;
+		}
+		
+		/** マス目に文字を書く関数
+			* gpt
+			*/
+			function drawBoardLetters(letters) {
+				if (letters){
+				    const ctx = board.getContext("2d");
+					resetSqareColor(false); // 正方形の色をリセット
+					boardFlg = true;
+
+				    ctx.font = "30px sans-serif";
+				    ctx.textAlign = "center";
+				    ctx.textBaseline = "middle";
+				    ctx.fillStyle = "white";
+
+				    for (let i = 0; i < n * n; i++) {
+				        if (i < letters.length) {
+				            const row = Math.floor(i / n);
+				            const col = i % n;
+
+				            // 各マスの中心座標
+				            const x = offsetX + col * size + size / 2;
+				            const y = offsetY + row * size + size / 2;
+
+				            ctx.fillText(letters[i], x, y);
+				        }
+				    }
+				}
+			}
+
+			// マス目の文字をリセットする関数
+			function resetBoardLetters() {
+			    drawGrid(); // マスを再描画
+			}
+
+		
+		
+		/** Sequence問題のリセット処理
+		* 解答ボタンの色をリセット
+		* 解答リストをリセット
+		* 解答セットもリセット
+		*
+		*/
+		function resetSequence(){
+			resetSqareColor(); // 正方形の色をリセット
+			answerListSequence.length = 0; // 解答のリストをリセット
+			answerSet.clear(); // セットもリセット
+			// 解答ボタンに文字がある場合はそれを再描画
+			if (boardFlg){
+				drawBoardLetters(problems[player.floor].squareList);
+			}
+		}
+		
+		/** mainのimgを表示して引数のソースをセット
+		*
+		*
+		*/
+		function setMainImage(src){
+			main.style.display = "block";
+			main.src = src;
+		}
+		
+		/** 難易度を下げながらフラッシュ暗算問題を再生する
+		*
+		*/
+		function flashProb(problem){
+			problem.answer = problem.yobiAnswer[flashIndex];
+			problem.yobi1 = problem.answer.length;
+			flashList(problem.yobi2[flashIndex],500);
+			if (flashIndex < 4){
+				flashIndex++;
+			}
+			
+		}
+		
+		/** リストの内容を連続で表示する関数
+		* @param ms インターバル
+		*
+		*/
+		function flashList(list , ms) {
+		  const center = document.getElementById("center"); // 既存の要素に合わせて変更
+		  let index = 0;
+
+		  flashTimerId = setInterval(() => {
+		    if (index >= list.length) {
+		      clearInterval(flashTimerId); // 最後まで表示したら停止
+		      return;
+		    }
+		    center.textContent = list[index];
+		    index++;
+		  }, ms); // 500ms = 0.5秒
+		}
+		
+		/** 一筆書きで画面表示とマップを変更する
+		*
+		*/
+		function oneStrokeMoving(){
+			oneStrokeMap[x][y] = 1;
+			fillSquare(y,x,"blue");
+			if (endMove()){
+				if(checkStorokeAnswer()){
+					correct();
+				}else{
+					incorrect();
+					if (specStrokeFlg){
+						oneStrokeReset(5,7,problems[player.floor].map)
+					}else{
+						oneStrokeReset(4,3,problems[player.floor].map);
+					}
+					return true;
+				}
+			}
+			return false;
+		}
+		/** 一筆書きの正誤判定
+		*
+		*/
+		function checkStorokeAnswer() {
+		    for (let row = 0; row < oneStrokeMap.length; row++) {
+		        for (let col = 0; col < oneStrokeMap[row].length; col++) {
+		            if (oneStrokeMap[row][col] !== 1) {
+		                return false; // 1でないマスがあったら false
+		            }
+		        }
+		    }
+		    return true; // 全部1なら true
+		}
+		
+		/** 一筆書きでまだ進めるマスがあるかどうかを確認する
+		*
+		*/
+		function endMove(){
+			if ((x <= 0 || oneStrokeMap[x-1][y] == 1) &&  (x >= oneStrokeMap.length-1 || oneStrokeMap[x+1][y] == 1) && (y <= 0 || oneStrokeMap[x][y-1] == 1) && (y >= oneStrokeMap[x].length-1 || oneStrokeMap[x][y+1] == 1) ){
+				return true;
+			}else{
+				return false;
+			}
+		}
+
+		/** 一筆書きで移動できる場合に座標を移動後にする
+		* @param move 移動量
+		* @param flg  xを移動させるならtrue
+		*/
+		function checkMove (move,flg){
+			let afterX = x;
+			let afterY = y;
+			if (flg){
+				afterX += move;
+			}else{
+				afterY += move;
+			}
+			if (afterX < 0 || afterX >= oneStrokeMap.length || afterY < 0 || afterY >= oneStrokeMap[0].length || oneStrokeMap[afterX][afterY] == 1){
+				return false;
+			}else{
+				x = afterX;
+				y = afterY;
+				let endStrokeFlg = oneStrokeMoving();
+				if (endStrokeFlg){
+					return false;
+				}else {
+					return true;
+				}
+			}
+		}
+		
+		/** 25問目でライトを回転させる
+		*
+		*/ 
+		function rotateCircle(){
+			for (let i = 0; i <4 ; i++){
+				// 円を透明にリセット
+				clearCircle(i);
+			}
+			// 配列を回転
+			rotateArray();
+			for (let i = 0; i <4 ; i++){
+				// 円
+				if (circleStates[i]){
+					fillCircleByIndex(i,problems[player.floor].colors[circleStates[i]]);
+				}
+				
+			}
+		}
+		
+		
+		
+		/** 点滅暗記問題の再生関数
+		* @param {*} list 点滅する順番のリスト
+		* @param {*} time 点滅している時間のリスト
+		*/
+		function flash(list,time){
+			canOperate = false;
+			setTimeout(()=>{
+				blinkSequence(list);
+			},1000);
+			setTimeout(()=>{
+				document.getElementById("message").textContent = "順に押せ";
+				canOperate = true;
+			},time); 
+		}
+		
+		/** 円を透明にする (circleStatesのリセットは別でやる)
+		*
+		*/
+
+		function clearCircle(index) {
+		    const [x, y] = positions[index];
+		    const r = 40;
+
+		    ctx.save(); // 状態保存
+		    ctx.globalCompositeOperation = "destination-out"; // 上書きで透明にする
+		    ctx.beginPath();
+		    ctx.arc(x, y, r, 0, Math.PI * 2);
+		    ctx.fill();
+		    ctx.restore(); // 状態復元
+
+		}
+		
+		/**
+		* 画面の中心に4つの円を描画する関数
+		*/
+		function drawFourCircles() {
+		    const centerX = canvas.width / 2 ;
+		    const centerY = canvas.height / 2 + 150 ;
+		    const radius = 40;      // 円の半径
+		    const gap = 250;        // 中心からの距離（十分な距離をとる）
+
+		    positions.push([centerX - gap, centerY]);
+			positions.push([centerX + gap, centerY]);
+			positions.push([centerX, centerY - gap]);
+			positions.push([centerX, centerY + gap]);
+
+
+		    ctx.lineWidth = 3;
+
+		    positions.forEach(([x, y]) => {
+		        ctx.beginPath();
+		        ctx.arc(x, y, radius, 0, Math.PI * 2);
+				ctx.strokeStyle = "white";
+		        ctx.stroke();
+				circlePositions.push({x,y,r:radius}); // 座標と半径を塗りつぶしのために保存
+		    });
+		}
+
+		/** ライト(中心の丸)を塗りつぶす
+		* @param {number} index 0 ~ 3
+		* 
+		*/
+
+		function fillCircleByIndex(index, color) {
+		    const c = circlePositions[index];
+		    if (!c) return;
+
+		    ctx.beginPath();
+		    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+		    ctx.fillStyle = color;
+		    ctx.fill();
+		    ctx.strokeStyle = "white"; // 枠も維持
+		    ctx.stroke();
+		}
+		
+
+		/** キーに対応したピアノ音を再生
+		*
+		*/
+		function piano(key){
+			switch (key){
+				case "4": {
+					new Audio("/piano/la.mp3").play();
+					break;
+				}
+				case "8": {
+					new Audio("/piano/so.mp3").play();
+					break;
+				}
+				case "1": {
+					new Audio("/piano/do.mp3").play();
+					break;
+				}
+				case "7": {
+					new Audio("/piano/mi.mp3").play();
+					break;
+				}
+				case "3": {
+					new Audio("/piano/re.mp3").play();
+					break;
+				}
+				case "2": {
+					new Audio("/piano/do2.mp3").play();
+					break;
+				}
+				case "6": {
+					new Audio("/piano/fa.mp3").play();
+					break;
+				}
+				case "5": {
+					new Audio("/piano/si.mp3").play();
+					break;
+				}
+			}
+
+		}
+		
+		/** 一筆書きの初期化処理
+		 * @param {number} syokiX - スタート位置のx座標
+		 * @param {number} syokiY - スタート位置のy座標
+		 * @param {Array<Array<number>>} syokiMap - 初期マップ（0:通路, 1:壁）
+		 */
+		function oneStrokeReset(syokiX, syokiY, syokiMap) {
+		    // まずマップをコピー
+		    for (let row = 0; row < syokiMap.length; row++) {
+		        for (let col = 0; col < syokiMap[row].length; col++) {
+		            oneStrokeMap[row][col] = syokiMap[row][col];
+		        }
+		    }
+
+		    // キャンバス全体をクリアしてグリッド再描画
+		    ctx.clearRect(0, 0, canvas.width, canvas.height);
+			if (specStrokeFlg){
+				makeSquaresGrid(9);
+			}else {
+				makeSquaresGrid(8);
+			}
+
+			// マップの1を白で塗る
+			for (let row = 0; row < oneStrokeMap.length; row++) {
+			    for (let col = 0; col < oneStrokeMap[row].length; col++) {
+			        if (oneStrokeMap[row][col] === 1) {
+			            fillSquare(col, row,"white"); // fillSquare は (x, y) で塗る
+			        }
+			    }
+			}
+
+
+		    // プレイヤー位置を初期位置にセット
+		    x = syokiX;
+		    y = syokiY;
+
+		    // スタート位置も塗る
+		    fillSquare(y, x,"blue");
+			oneStrokeMap[x][y] = 1;
+		}
+
+
+		/** キーを受け取ってcheckMoveを呼び出す
+		*
+		*/
+		function moving(key){
+			switch(key){
+				case "2": {
+					return checkMove(-1,true);
+				}
+				case "4": {
+					return checkMove(-1,false);
+				}
+				case "6": {
+					return checkMove(1,false);
+				}
+				case "8": {
+					return checkMove(1,true);
+				}
+			}
+		}
+		
+		/** 時間の下一桁に応じてインデックスを返す
+		*
+		*/
+		function timeProb(){
+			if (totalSeconds%10 == 1){
+				return 1;
+			}else if (totalSeconds%10 == 3){
+				return 2;
+			}else if (totalSeconds%10 == 5){
+				return 3;
+			}else if (totalSeconds%10 == 7){
+				return 4;
+			}else{
+				return 5;
+			}
+		}
+		
+		/** 画像をリストで描画する関数
+		*
+		*
+		*/
+		function useMainImageList(imageList , key){
+			setMainImage(imageList[key]);
+		}
+		
+		/**
+		*
+		*/
+		function flgReset(){
+			boardFlg = false; // 解答ボタンに文字を置くかどうか
+			flash1Flg = false; // 点滅問題1の専用フラグ
+			flash2Flg = false; // 点滅問題1の専用フラグ
+			simulSequenceFlg = false // 点滅暗記レベル2のフラグ(連続同時押しフラグ)
+			fruitFlg = false // フルーツ問題のフラグ
+			chakaFlg = false;
+			chakaFlg2 = false;
+			doubleFlg = false; // 連続押し問題の2回押し問題
+			pianoFlg = false; // 音階問題のフラグ
+			flashMemoFlg = false; // フラッシュ暗記問題のフラグ
+			flashCulcFlg = false; // フラッシュ暗算問題のフラグ
+			crossFlg = false; // xを数える問題のフラグ
+			specStrokeFlg = false; // 一筆書き問題の特殊フラグ
+			trainFlg = false; // 乗客カウント問題のフラグ
+			primeFlg = false; // 素数問題のフラグ
+			spotDiffFlg = false; // 間違い探し問題のフラグ
+			trainCount.style.display = "none";
+		}
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+			
+		/*
+		* マスの準備
+		*/
+		const size = 90;   // マスのサイズ
+		const n = 3;       // マスの数
+		let offsetX = 1580; // X方向の移動量
+		let offsetY = 725; // Y方向の移動量
+			
+		/*
+		* canvasの準備
+		*/
+		const canvas = document.getElementById("board");
+		canvas.width = 1900;
+		canvas.height = 1000;
+		const ctx = canvas.getContext("2d");
+		
+
+		/** 階層移動処理を実行する
+		*
+		* 
+		*/
+		function changeFloor() {
+		
+		    changeFloorUtil(); // 共通処理をまず実行
+			const problem = problems[player.floor];
+			if (lastFlg){
+				flgReset();
+			}
+			switch(player.floor) {
+		        case 1: {
+		            // 1問目の処理
+		            blinkInterval = setInterval(() => {
+		                blink(0, 0, "white");
+		            }, 800);
+		            break;
+		        }
+				case 2: {
+					makeSquare();
+					break;
+				}
+				case 3: {
+				    // player.floor が 2 のときの処理
+				    setMainImage("tower_4th_kanji.png");
+				    break;
+				}	
+				case 4: {
+					setMainImage("tower_5th_kanji.png");
+					break;
+				}	
+				case 5: {
+					blinkInterval = setInterval(() => {
+						blink(0,1,"white");
+						blink(1,1,"white");
+						blink(2,1,"white");
+					}, 800);
+					break;
+				}
+				case 6: {
+					oneStrokeReset(4,3,problems[player.floor].map);
+					break;
+				}case 7: {
+					drawBoardLetters(problems[player.floor].squareList); // これ曜日
+					setMainImage("month.png");
+					boardFlg = true;
+					break;
+				}
+				case 8: {
+					flash1Flg = true;
+					boardFlg = false;
+					message.textContent = "覚える";
+					flash( [2,7,6,9,1,3,8,5,4],5500);
+					break;
+				}
+				case 9: {
+					drawBoardLetters(["1","2","3","4","5","6","7","8","9"]);
+					flash1Flg = false;
+					spotDiffFlg = true;
+					setMainImage("間違い探し画像.png");
+					break;
+				}
+				case 10: {
+					boardFlg = false;
+					spotDiffFlg = false;
+					oneStrokeReset(4,3,problems[player.floor].map);
+					drawGrid();
+					break;
+				}
+				case 11: {
+					simulSequenceFlg = true;
+					flash2Flg = true;
+					canOperate = false;
+					setTimeout(()=>{
+						blinkSequence(["1","5","1","1"]);
+						blinkSequence(["2","6","4","2"]);
+						blinkSequence(["5","7","6","3"]);
+						blinkSequence(["9","8","9","5"]);
+					},1000);
+					setTimeout(()=>{
+						document.getElementById("message").textContent = "順に押せ";
+						canOperate = true;
+					},3300);
+					break;
+				}
+				case 12: {
+					setMainImage("九九.png");
+					simulSequenceFlg = false;
+					flash2Flg = false;
+					break;
+				}
+				case 13: {
+					setMainImage("tower_7th_month.png");
+					drawBoardLetters(problem.squareList);
+					break;
+				}
+				case 14: {
+					boardFlg = false;
+					setMainImage("corner.png");
+					break;
+				}
+				case 15: {
+					drawBoardLetters(["1","2","3","4","決","6","7","8","9"]);
+					boardFlg = true;
+					break;
+				}case 16: {
+					drawBoardLetters(["11","13","8","18","10","24","14","7","16"]);
+					boardFlg = false;
+					chakaFlg = true;
+					break;
+				}case 17: {
+					drawBoardLetters(["19","21","13","17","15","24","20","13","18"]);
+					chakaFlg = false;
+					chakaFlg2 = true;
+					break;
+				}
+				case 18: {
+					boardFlg = false;
+					chakaFlg = false;
+					setMainImage("数字.png");
+					break;
+					
+				}
+				case 19: {
+					drawFourCircles();
+					break;
+				}
+				case 20: {
+					center.textContent = sumCount;
+					break;
+				}
+				case 21: {
+					doubleFlg = true;
+					setMainImage("ショートケーキ(白なし).png");
+					break;
+				}
+				case 22: {
+					doubleFlg = false;
+					setMainImage("pianoImage.png");
+					pianoFlg = true;
+					break;
+				}
+				case 23: {
+					pianoFlg = false;
+					flashCulcFlg = true;
+					drawBoardLetters(["1","2","3","4","5","6","7","8","9"]);
+					flashProb(problem);
+					break;
+					break;
+				}
+				case 24: {
+					boardFlg = false;
+					flashCulcFlg = false;
+					changeSquareColor(changeNum(1)[0],changeNum(1)[1],"red");
+					changeSquareColor(changeNum(3)[0],changeNum(3)[1],"blue");
+					changeSquareColor(changeNum(7)[0],changeNum(7)[1],"green");
+					changeSquareColor(changeNum(9)[0],changeNum(9)[1],"yellow");
+					fruitFlg = true;
+					break;
+				}
+				case 25: {
+					setMainImage("時計.png");
+					fruitFlg = false;
+					drawFourCircles();
+					break;
+				}
+				case 26: {
+					flashMemoFlg = true;
+					canOperate = false;
+					drawBoardLetters(["1","2","3","4","5","6","7","8","9"]);
+					setTimeout(() => {
+						flashList(problem.flashList,500);
+					},500);
+					setTimeout(() => {
+						message.textContent = "答えろ";
+						canOperate = true;
+					},5000)
+					break;
+				}
+				case 27: {
+					boardFlg = false;
+					flashMemoFlg = false;
+					setMainImage("tower_6th_rainbow/1color.png");
+					changeSquareColor(0,1,"blue");
+					changeSquareColor(2,1,"skyblue");
+					changeSquareColor(1,0,"green");
+					changeSquareColor(1,1,"yellow");
+					changeSquareColor(0,0,"orange");
+					changeSquareColor(2,0,"red");
+					break;
+				}
+				case 28 : {
+					drawBoardLetters(["10","11","12","13","14","15","16","17","18"]);
+					crossFlg = true;
+					canOperate = false;
+					setTimeout(() => {
+						flashList(cross,300);
+					},500)
+					setTimeout(() => {
+						canOperate = true;
+						message.textContent = "答えろ";
+					},7500);
+					break;
+				}
+				case 29 : {
+					boardFlg = false;
+					crossFlg = false;
+					oneStrokeMap = Array.from({ length: 9 }, () => Array(10).fill(0)); // 一筆書きの状況を保存するマップを29問目用に更新(改善の余地あり)
+					specStrokeFlg = true;
+					oneStrokeReset(5,7,problems[player.floor].map);
+					break;
+				}
+				case 30 : {
+					drawBoardLetters(["1","2","3","4","5","6","7","8","9"]);
+					canOperate = false;
+					flashList(problem.yobi2,500);
+					setTimeout(() => {
+						canOperate = true;
+					},3000); // ここもちゃんと確かめた
+					problem.yobi1 = player.qrid.length ;
+					break;
+				}
+				case 31 : {
+					setMainImage("孤立探し.png");
+					drawBoardLetters(["1","2","3","4","5","6","7","8","9"]);
+					break;
+				}
+				case 32 : {
+					trainFlg = true;
+					drawBoardLetters(["1","2","3","4","5","6","7","8","9"]);
+					trainCount.style.display = "block";
+					break;
+				}
+				case 33 : {
+					boardFlg = false;
+					darumaFlg = true;
+					sub.textContent = darumaCount;
+					trainCount.style.display = "none";
+					break;
+				}
+				case 34 : {
+					darumaFlg = false;
+					daruma.pause();
+					
+					primeFlg = true;
+					daruma.style.display = "none";
+					drawBoardLetters(["1","2","3","4","5","6","7","8","9"]);
+					canOperate = false;
+					setTimeout(() => {
+						flashList(prime,400);
+					},500)
+					setTimeout(() => {
+						canOperate = true;
+						message.textContent = "答えろ";
+					},9000);
+					break;
+				}
+				case 35 : {
+					primeFlg = false;
+					lastFlg = true;
+					break;
+					
+				}
+			}
+			if (lastFlg){
+				resetBoardLetters();
+				drawBoardLetters(lastList[lastIndex%6]);
+				
+			}
+		}
+
+			
+
+	
+		
+		
+		startPolling(pcNum); //ポーリングの起動
+		
+		
+	</script>
+</body>
+</html>

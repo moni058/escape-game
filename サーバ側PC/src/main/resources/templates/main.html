@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+<link rel ="stylesheet" href ="/main.css">
+</head>
+<body>
+	<input type="text" id ="qrid" autofocus/>
+	<img id ="QRwait" class ="fullscreen" src ="/QRwait.jpg">
+	<img id ="waiting" class ="fullscreen" src ="/waiting.jpg">
+	<img id ="moveGamePoint" class ="fullscreen" src ="/moveGamePoint.jpg">
+	<video id ="OP" class ="fullscreen" src ="/OP.mp4"></video>
+	<script src="/main.js"></script>
+	<script>
+		document.addEventListener("DOMContentLoaded",() => {
+			const input = document.getElementById("qrid");
+			
+			// QRリーダーがエンターを押したタイミングで入力欄の内容を使って、nextPlayerのセット処理を起動
+			input.addEventListener("keypress" , async(event) =>{
+				if(!stopFlg){
+					if (event.key ==="Enter"){
+						const qrid = input.value.trim();
+						if (!qrid) return;
+			
+						try{
+							const response = await fetch("http://localhost:9910/api/next/player",{
+								method: "POST",
+								headers:{"Content-Type": "application/json"},
+								body:JSON.stringify({QRId:qrid})
+							});
+							startOP();
+						} catch(err){
+							console.log("エラー",err);
+						} finally{
+							input.value = "";
+							input.focus();
+						}
+					}
+				}
+			} )
+		})
+		
+		let nowPC = 5; // サーバーから受け取るPC番号を保存
+
+		// 3秒ごとにサーバーへ問い合わせ
+		setInterval(() => {
+		  fetch("http://localhost:9910/api/nowPC") // ← 自分のSpring BootのIPに合わせて変更
+		    .then(response => {
+		      if (!response.ok) throw new Error("サーバー応答エラー");
+		      return response.json(); // JSONとして受け取る
+		    })
+		    .then(data => {
+		      nowPC = data.nowPC; // サーバーから { "nowPC": 3 } みたいに返ってくる想定
+		      console.log("現在のPC番号:", nowPC);
+		    })
+		    .catch(err => console.error("通信エラー:", err));
+		}, 3000); // ← 3秒ごとに実行（3000ミリ秒）
+		waitingPolling();
+	</script>
+</body>
+</html>
